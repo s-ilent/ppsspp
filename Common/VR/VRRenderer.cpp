@@ -285,6 +285,7 @@ bool VR_InitFrame( engine_t* engine ) {
 	}
 
 	// Update passthrough
+#ifdef ANDROID
 	if (passthroughRunning != (VR_GetConfig(VR_CONFIG_PASSTHROUGH) != 0)) {
 		if (VR_GetConfig(VR_CONFIG_PASSTHROUGH)) {
 			OXR(xrPassthroughLayerResumeFB(passthroughLayer));
@@ -293,6 +294,7 @@ bool VR_InitFrame( engine_t* engine ) {
 		}
 		passthroughRunning = (VR_GetConfig(VR_CONFIG_PASSTHROUGH) != 0);
 	}
+#endif
 
 	frameState.type = XR_TYPE_FRAME_STATE;
 	frameState.next = NULL;

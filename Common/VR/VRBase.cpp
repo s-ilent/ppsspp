@@ -40,8 +40,12 @@ void VR_Init( void* system, const char* name, int version ) {
 #endif
 
 	std::vector<const char *> extensions;
-#ifdef XR_USE_GRAPHICS_API_OPENGL_ES
+#if defined(XR_USE_GRAPHICS_API_OPENGL_ES) || defined(XR_USE_GRAPHICS_API_OPENGL)
+#if defined(__ANDROID__)
 	extensions.push_back(XR_KHR_OPENGL_ES_ENABLE_EXTENSION_NAME);
+#elif defined(_WIN32)
+	extensions.push_back(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME);
+#endif
 #endif
 	extensions.push_back(XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME);
 #ifdef ANDROID
@@ -121,16 +125,28 @@ void VR_Init( void* system, const char* name, int version ) {
 	}
 
 	// Get the graphics requirements.
-#ifdef XR_USE_GRAPHICS_API_OPENGL_ES
+#if defined(XR_USE_GRAPHICS_API_OPENGL_ES) || defined(XR_USE_GRAPHICS_API_OPENGL)
+#if defined(__ANDROID__)
 	PFN_xrGetOpenGLESGraphicsRequirementsKHR pfnGetOpenGLESGraphicsRequirementsKHR = NULL;
 	OXR(xrGetInstanceProcAddr(
-			vr_engine.appState.Instance,
-			"xrGetOpenGLESGraphicsRequirementsKHR",
-			(PFN_xrVoidFunction*)(&pfnGetOpenGLESGraphicsRequirementsKHR)));
+		vr_engine.appState.Instance, 
+		"xrGetOpenGLESGraphicsRequirementsKHR", 
+		(PFN_xrVoidFunction*)(&pfnGetOpenGLESGraphicsRequirementsKHR)));
 
 	XrGraphicsRequirementsOpenGLESKHR graphicsRequirements = {};
 	graphicsRequirements.type = XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_ES_KHR;
 	OXR(pfnGetOpenGLESGraphicsRequirementsKHR(vr_engine.appState.Instance, systemId, &graphicsRequirements));
+#elif defined(_WIN32)
+	PFN_xrGetOpenGLGraphicsRequirementsKHR pfnGetOpenGLGraphicsRequirementsKHR = NULL;
+	OXR(xrGetInstanceProcAddr(
+		vr_engine.appState.Instance, 
+		"xrGetOpenGLGraphicsRequirementsKHR", 
+		(PFN_xrVoidFunction*)(&pfnGetOpenGLGraphicsRequirementsKHR)));
+
+	XrGraphicsRequirementsOpenGLKHR graphicsRequirements = {};
+	graphicsRequirements.type = XR_TYPE_GRAPHICS_REQUIREMENTS_OPENGL_KHR;
+	OXR(pfnGetOpenGLGraphicsRequirementsKHR(vr_engine.appState.Instance, systemId, &graphicsRequirements));
+#endif
 #endif
 
 #ifdef ANDROID
@@ -154,27 +170,30 @@ void VR_EnterVR( engine_t* engine ) {
 		return;
 	}
 
-	// Create the OpenXR Session.
+	// Create the OpenXR Session
 	XrSessionCreateInfo sessionCreateInfo = {};
-#ifdef ANDROID
-	XrGraphicsBindingOpenGLESAndroidKHR graphicsBindingGL = {};
-#elif XR_USE_GRAPHICS_API_OPENGL
-	XrGraphicsBindingOpenGLWin32KHR graphicsBindingGL = {};
-#endif
 	memset(&sessionCreateInfo, 0, sizeof(sessionCreateInfo));
-#ifdef ANDROID
-	graphicsBindingGL.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_ES_ANDROID_KHR;
-	graphicsBindingGL.next = NULL;
-	graphicsBindingGL.display = eglGetCurrentDisplay();
-	graphicsBindingGL.config = NULL;
-	graphicsBindingGL.context = eglGetCurrentContext();
-	sessionCreateInfo.next = &graphicsBindingGL;
-#else
-	//TODO:PCVR definition
-#endif
 	sessionCreateInfo.type = XR_TYPE_SESSION_CREATE_INFO;
 	sessionCreateInfo.createFlags = 0;
 	sessionCreateInfo.systemId = engine->appState.SystemId;
+	sessionCreateInfo.next = NULL; // Initialize next pointer
+
+#ifdef ANDROID
+	XrGraphicsBindingOpenGLESAndroidKHR graphicsBindingGL = {};
+	graphicsBindingGL.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_ES_ANDROID_KHR;
+	graphicsBindingGL.next = NULL;
+	graphicsBindingGL.display = eglGetCurrentDisplay();
+	graphicsBindingGL.config = NULL; 
+	graphicsBindingGL.context = eglGetCurrentContext();
+	sessionCreateInfo.next = (const XrBaseInStructure*)&graphicsBindingGL;
+#elif defined(_WIN32) && defined(XR_USE_GRAPHICS_API_OPENGL)
+	XrGraphicsBindingOpenGLWin32KHR graphicsBindingGL = {};
+	graphicsBindingGL.type = XR_TYPE_GRAPHICS_BINDING_OPENGL_WIN32_KHR;
+	graphicsBindingGL.next = NULL;
+	graphicsBindingGL.hDC = wglGetCurrentDC();
+	graphicsBindingGL.hGLRC = wglGetCurrentContext();
+	sessionCreateInfo.next = (const XrBaseInStructure*)&graphicsBindingGL;
+#endif
 
 	XrResult initResult;
 	OXR(initResult = xrCreateSession(engine->appState.Instance, &sessionCreateInfo, &engine->appState.Session));
