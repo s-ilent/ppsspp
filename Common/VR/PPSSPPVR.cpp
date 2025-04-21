@@ -170,6 +170,21 @@ void InitVROnAndroid(void* vm, void* activity, const char* system, int version, 
 }
 #endif
 
+#if PPSSPP_PLATFORM(WINDOWS)
+void InitVROnWindows() {
+	std::string appName = "PPSSPP"; 
+#ifdef PPSSPP_GIT_VERSION
+	Version gitVer(PPSSPP_GIT_VERSION);
+	int appVersion = gitVer.ToInteger();
+#else
+	int appVersion = 1; // Fallback
+#endif
+	// Default supersampling
+	VR_SetConfigFloat(VR_CONFIG_VIEWPORT_SUPERSAMPLING, 1.0f);
+	VR_Init(nullptr, appName.c_str(), appVersion); // Pass nullptr for 'system' on Windows
+}
+#endif
+
 void EnterVR(bool firstStart) {
 	if (firstStart) {
 		engine_t* engine = VR_GetEngine();
