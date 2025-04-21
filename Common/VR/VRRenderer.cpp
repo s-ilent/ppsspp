@@ -445,6 +445,7 @@ void VR_FinishFrame( engine_t* engine ) {
 		XrQuaternionf pitch = XrQuaternionf_CreateFromVectorAngle({1, 0, 0}, -menuPitch);
 		XrQuaternionf yaw = XrQuaternionf_CreateFromVectorAngle({0, 1, 0}, menuYaw);
 
+#ifdef ANDROID
 		// Setup the cylinder layer
 		XrCompositionLayerCylinderKHR cylinder_layer = {};
 		cylinder_layer.type = XR_TYPE_COMPOSITION_LAYER_CYLINDER_KHR;
@@ -487,6 +488,48 @@ void VR_FinishFrame( engine_t* engine ) {
 			cylinder_layer.subImage.swapchain = engine->appState.Renderer.FrameBuffer[1].ColorSwapChain.Handle;
 			engine->appState.Layers[engine->appState.LayerCount++].Cylinder = cylinder_layer;
 		}
+#elif WIN32 
+		// Cylinder layer not supported on SteamVR; fallback to quad
+		XrCompositionLayerQuad quad_layer = {};
+		quad_layer.type = XR_TYPE_COMPOSITION_LAYER_QUAD;
+		quad_layer.layerFlags = XR_COMPOSITION_LAYER_BLEND_TEXTURE_SOURCE_ALPHA_BIT;
+		quad_layer.space = engine->appState.CurrentSpace;
+		quad_layer.subImage = {}; 
+		quad_layer.subImage.swapchain = engine->appState.Renderer.FrameBuffer[0].ColorSwapChain.Handle;
+		quad_layer.subImage.imageRect.offset = { 0, 0 };
+		quad_layer.subImage.imageRect.extent = {
+			(int32_t)engine->appState.Renderer.FrameBuffer[0].ColorSwapChain.Width,
+			(int32_t)engine->appState.Renderer.FrameBuffer[0].ColorSwapChain.Height };
+		quad_layer.subImage.imageArrayIndex = 0;
+		// Pose
+		quad_layer.pose.orientation = XrQuaternionf_Multiply(pitch, yaw);
+		quad_layer.pose.position = pos;
+		if (headTracking && !reprojection) {
+			// Adjust if needed
+		}
+		quad_layer.size.width = 4; 
+		quad_layer.size.height = 4;
+
+		if ((vrMode == VR_MODE_MONO_SCREEN) || (vrMode == VR_MODE_MONO_6DOF)) {
+			quad_layer.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
+			engine->appState.Layers[engine->appState.LayerCount++].Quad = quad_layer;
+		}
+		else if ((vrMode == VR_MODE_SBS_SCREEN) || (vrMode == VR_MODE_SBS_6DOF)) {
+			quad_layer.eyeVisibility = XR_EYE_VISIBILITY_LEFT;
+			quad_layer.subImage.imageRect.extent.width /= 2;
+			engine->appState.Layers[engine->appState.LayerCount++].Quad = quad_layer;
+			quad_layer.eyeVisibility = XR_EYE_VISIBILITY_RIGHT;
+			quad_layer.subImage.imageRect.offset.x += quad_layer.subImage.imageRect.extent.width;
+			engine->appState.Layers[engine->appState.LayerCount++].Quad = quad_layer;
+		}
+		else { // Stereo
+			quad_layer.eyeVisibility = XR_EYE_VISIBILITY_LEFT;
+			engine->appState.Layers[engine->appState.LayerCount++].Quad = quad_layer;
+			quad_layer.eyeVisibility = XR_EYE_VISIBILITY_RIGHT;
+			quad_layer.subImage.swapchain = engine->appState.Renderer.FrameBuffer[1].ColorSwapChain.Handle; 
+			engine->appState.Layers[engine->appState.LayerCount++].Quad = quad_layer;
+		}
+#endif
 	}
 
 	// Compose the layers for this frame.

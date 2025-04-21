@@ -39,6 +39,7 @@ void VR_Init( void* system, const char* name, int version ) {
 	}
 #endif
 
+	// todo: check with xrEnumerateInstanceExtensionProperties
 	std::vector<const char *> extensions;
 #if defined(XR_USE_GRAPHICS_API_OPENGL_ES) || defined(XR_USE_GRAPHICS_API_OPENGL)
 #if defined(__ANDROID__)
@@ -47,8 +48,9 @@ void VR_Init( void* system, const char* name, int version ) {
 	extensions.push_back(XR_KHR_OPENGL_ENABLE_EXTENSION_NAME);
 #endif
 #endif
-	extensions.push_back(XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME);
+	// Cylinder not supported on SteamVR, so skip it for now
 #ifdef ANDROID
+	extensions.push_back(XR_KHR_COMPOSITION_LAYER_CYLINDER_EXTENSION_NAME);
 	if (VR_GetPlatformFlag(VR_PLATFORM_EXTENSION_INSTANCE)) {
 		extensions.push_back(XR_KHR_ANDROID_CREATE_INSTANCE_EXTENSION_NAME);
 	}
