@@ -87,21 +87,17 @@ bool XRLoad() {
 	return false;
 #endif
 
-	// Load the three basic functions.
+	// Load the basic functions.
 	xrGetInstanceProcAddr = (PFN_xrGetInstanceProcAddr)dlsym(g_xrLibrary, "xrGetInstanceProcAddr");
-	xrEnumerateApiLayerProperties = (PFN_xrEnumerateApiLayerProperties)dlsym(g_xrLibrary, "xrEnumerateApiLayerProperties");
-	xrEnumerateInstanceExtensionProperties = (PFN_xrEnumerateInstanceExtensionProperties)dlsym(g_xrLibrary, "xrEnumerateInstanceExtensionProperties");
+	xrGetInstanceProcAddr(XR_NULL_HANDLE, "xrCreateInstance", (PFN_xrVoidFunction*)(&xrCreateInstance));
+	xrGetInstanceProcAddr(XR_NULL_HANDLE, "xrEnumerateApiLayerProperties", (PFN_xrVoidFunction*)(&xrEnumerateApiLayerProperties));
+	xrGetInstanceProcAddr(XR_NULL_HANDLE, "xrEnumerateInstanceExtensionProperties", (PFN_xrVoidFunction*)(&xrEnumerateInstanceExtensionProperties));
 
 	// Load the rest.
 	return true;
 }
 
 void XRLoadInstanceFunctions(XrInstance instance) {
-	LOAD_INSTANCE_FUNC(xrCreateInstance);
-	LOAD_INSTANCE_FUNC(xrGetInstanceProcAddr);
-	LOAD_INSTANCE_FUNC(xrEnumerateApiLayerProperties);
-	LOAD_INSTANCE_FUNC(xrEnumerateInstanceExtensionProperties);
-	LOAD_INSTANCE_FUNC(xrCreateInstance);
 	LOAD_INSTANCE_FUNC(xrDestroyInstance);
 	LOAD_INSTANCE_FUNC(xrGetInstanceProperties);
 	LOAD_INSTANCE_FUNC(xrPollEvent);
