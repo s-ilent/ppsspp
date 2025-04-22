@@ -30,6 +30,9 @@
 #endif
 #include "Windows/GPU/WindowsVulkanContext.h"
 #include "Windows/GPU/D3D11Context.h"
+#include <VR/PPSSPPVR.h>
+#include <VR/VRBase.h>
+#include <VR/VRRenderer.h>
 
 enum class EmuThreadState {
 	DISABLED,
@@ -51,6 +54,45 @@ extern std::vector<std::wstring> GetWideCmdLine();
 
 class GraphicsContext;
 static GraphicsContext *g_graphicsContext;
+
+bool DisplayInitVRWindows() {
+	engine_t* engine = VR_GetEngine();
+	if (!engine || !engine->appState.Instance) {
+		ALOGE("DisplayInitVRWindows: VR Engine or Instance not ready.");
+		return false;
+	}
+
+	const bool firstTimeSetup = (engine->appState.Session == XR_NULL_HANDLE);
+
+	if (firstTimeSetup) {
+		ALOGV("DisplayInitVRWindows: Performing first-time VR setup (Session, Renderer, Input Callbacks).");
+
+		EnterVR(engine);
+		if (!engine->appState.Session) {
+			ALOGE("DisplayInitVRWindows: VR_EnterVR failed to create session.");
+			// Consider calling VR_Destroy(engine) or specific cleanup.
+			return false;
+		}
+
+		VR_InitRenderer(engine);
+		// TODO: Check if VR_InitRenderer succeeded.
+
+		SetVRCallbacks(NativeAxis, NativeKey, NativeTouch);
+
+	}
+	else {
+		// This path might be taken if the graphics context was lost and recreated.
+		// We might need to re-validate/re-bind the graphics context if that happened,
+		// but OpenXR session handling should ideally survive context loss if possible.
+		// For now, we assume the existing session is still valid and bound.
+		ALOGV("DisplayInitVRWindows: Re-entering (assuming existing session is valid).");
+		// Potentially call VR_InitRenderer again if resources were lost?
+		// VR_InitRenderer(engine);
+	}
+
+	ALOGV("DisplayInitVRWindows: Display initialization complete.");
+	return true;
+}
 
 void MainThreadFunc();
 
@@ -198,6 +240,8 @@ void MainThreadFunc() {
 		// Let's continue (and probably crash) just so they have a way to keep trying.
 	}
 
+	InitVROnWindows();
+
 	System_Notify(SystemNotification::UI);
 
 	std::string error_string;
@@ -257,6 +301,12 @@ void MainThreadFunc() {
 
 	GraphicsContext *graphicsContext = g_graphicsContext;
 
+	if (!DisplayInitVRWindows()) {
+		// TODO: log, maybe disable VR?
+		ERROR_LOG(Log::G3D, "DisplayInitVRWindows failed.");
+		// g_Config.bEnableVR = false;
+	}
+
 	if (!useEmuThread) {
 		NativeInitGraphics(graphicsContext);
 		NativeResized();
@@ -274,6 +324,37 @@ void MainThreadFunc() {
 	if (g_Config.bBrowse) {
 		PostMessage(MainWindow::GetHWND(), WM_COMMAND, ID_FILE_LOAD, 0);
 	}
+
+
+	while (emuThreadState != (int)EmuThreadState::DISABLED && GetUIState() != UISTATE_EXIT) { // Adjust loop condition
+		if (IsVREnabled() && VR_GetEngine() && VR_GetEngine()->appState.Session != XR_NULL_HANDLE) {
+			engine_t* engine = VR_GetEngine();
+
+			if (!StartVRRender()) {
+				sleep_ms(1, "waiting for vr render"); 
+				if (!graphicsContext->ThreadFrame()) { 
+					if (useEmuThread) EmuThreadStop();
+					break; 
+				}
+				continue;
+			}
+			if (!graphicsContext->ThreadFrame()) {
+				if (useEmuThread) EmuThreadStop();
+				break; 
+			}
+			UpdateVRInput(g_Config.bHapticFeedback, 1.0f); 
+
+			FinishVRRender(); 
+
+		}
+		else {
+			if (!graphicsContext->ThreadFrame()) {
+				if (useEmuThread) EmuThreadStop();
+				break;
+			}
+		}
+	} 
+
 
 	if (useEmuThread) {
 		while (emuThreadState != (int)EmuThreadState::DISABLED) {
@@ -310,6 +391,8 @@ void MainThreadFunc() {
 		}
 		EmuThreadJoin();
 	}
+
+	// TODO: Shutdown VR here?
 
 	if (!useEmuThread) {
 		NativeShutdownGraphics();
