@@ -238,6 +238,19 @@ XrActionStateVector2f GetActionStateVector2(XrAction action) {
 	return state;
 }
 
+void SuggestBindingsForProfile(XrInstance instance, XrPath profilePath, const XrActionSuggestedBinding* bindings, uint32_t count) {
+	XrInteractionProfileSuggestedBinding suggestedBindingsInfo = {};
+	suggestedBindingsInfo.type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING;
+	suggestedBindingsInfo.interactionProfile = profilePath;
+	suggestedBindingsInfo.suggestedBindings = bindings;
+	suggestedBindingsInfo.countSuggestedBindings = count;
+
+	XrResult result = xrSuggestInteractionProfileBindings(instance, &suggestedBindingsInfo);
+	if (XR_FAILED(result)) {
+		ALOGE("Failed to suggest bindings for profile %llu: %d", (long long)profilePath, result);
+	}
+}
+
 void IN_VRInit( engine_t *engine ) {
 	if (inputInitialized)
 		return;
@@ -265,37 +278,37 @@ void IN_VRInit( engine_t *engine ) {
 	handPoseLeftAction = CreateAction(runningActionSet, XR_ACTION_TYPE_POSE_INPUT, "hand_pose_left", NULL, 1, &leftHandPath);
 	handPoseRightAction = CreateAction(runningActionSet, XR_ACTION_TYPE_POSE_INPUT, "hand_pose_right", NULL, 1, &rightHandPath);
 
-	XrPath interactionProfilePath = XR_NULL_PATH;
-	if (VR_GetPlatformFlag(VR_PLATFORM_CONTROLLER_QUEST)) {
-		OXR(xrStringToPath(engine->appState.Instance, "/interaction_profiles/oculus/touch_controller", &interactionProfilePath));
-	} else if (VR_GetPlatformFlag(VR_PLATFORM_CONTROLLER_PICO)) {
-		OXR(xrStringToPath(engine->appState.Instance, "/interaction_profiles/pico/neo3_controller", &interactionProfilePath));
-	}
-
 	// Map bindings
-	XrActionSuggestedBinding bindings[32]; // large enough for all profiles
-	int currBinding = 0;
+	const uint32_t MAX_BINDINGS = 32; // Use a constant
+	XrActionSuggestedBinding bindings[MAX_BINDINGS];
+	uint32_t currBinding = 0;
 
+	XrPath simpleProfilePath, oculusProfilePath, indexProfilePath, picoProfilePath;
+	OXR(xrStringToPath(engine->appState.Instance, "/interaction_profiles/khr/simple_controller", &simpleProfilePath));
+	OXR(xrStringToPath(engine->appState.Instance, "/interaction_profiles/oculus/touch_controller", &oculusProfilePath));
+	OXR(xrStringToPath(engine->appState.Instance, "/interaction_profiles/valve/index_controller", &indexProfilePath));
+	OXR(xrStringToPath(engine->appState.Instance, "/interaction_profiles/pico/neo3_controller", &picoProfilePath));
 
-	if (VR_GetPlatformFlag(VR_PLATFORM_CONTROLLER_QUEST)) {
-		bindings[currBinding++] = ActionSuggestedBinding(indexLeftAction, "/user/hand/left/input/trigger");
-		bindings[currBinding++] = ActionSuggestedBinding(indexRightAction, "/user/hand/right/input/trigger");
-		bindings[currBinding++] = ActionSuggestedBinding(menuAction, "/user/hand/left/input/menu/click");
-	} else if (VR_GetPlatformFlag(VR_PLATFORM_CONTROLLER_PICO)) {
-		bindings[currBinding++] = ActionSuggestedBinding(indexLeftAction,  "/user/hand/left/input/trigger/click");
-		bindings[currBinding++] = ActionSuggestedBinding(indexRightAction,  "/user/hand/right/input/trigger/click");
-		bindings[currBinding++] = ActionSuggestedBinding(menuAction, "/user/hand/left/input/back/click");
-		bindings[currBinding++] = ActionSuggestedBinding(menuAction, "/user/hand/right/input/back/click");
-	} else { // Default for generic headset
-		bindings[currBinding++] = ActionSuggestedBinding(indexLeftAction, "/user/hand/left/input/trigger/click");
-		bindings[currBinding++] = ActionSuggestedBinding(indexRightAction, "/user/hand/right/input/trigger/click");
-		bindings[currBinding++] = ActionSuggestedBinding(menuAction, "/user/hand/left/input/back/click");
-		bindings[currBinding++] = ActionSuggestedBinding(menuAction, "/user/hand/right/input/back/click");
-	}
-	bindings[currBinding++] = ActionSuggestedBinding(buttonXAction, "/user/hand/left/input/x/click");
-	bindings[currBinding++] = ActionSuggestedBinding(buttonYAction, "/user/hand/left/input/y/click");
+	// KHR Simple Controller
+	currBinding = 0;
+	bindings[currBinding++] = ActionSuggestedBinding(indexLeftAction, "/user/hand/left/input/select/click");
+	bindings[currBinding++] = ActionSuggestedBinding(indexRightAction, "/user/hand/right/input/select/click");
+	bindings[currBinding++] = ActionSuggestedBinding(menuAction, "/user/hand/left/input/menu/click");
+	bindings[currBinding++] = ActionSuggestedBinding(handPoseLeftAction, "/user/hand/left/input/grip/pose");
+	bindings[currBinding++] = ActionSuggestedBinding(handPoseRightAction, "/user/hand/right/input/grip/pose");
+	bindings[currBinding++] = ActionSuggestedBinding(vibrateLeftFeedback, "/user/hand/left/output/haptic");
+	bindings[currBinding++] = ActionSuggestedBinding(vibrateRightFeedback, "/user/hand/right/output/haptic");
+	SuggestBindingsForProfile(engine->appState.Instance, simpleProfilePath, bindings, currBinding);
+
+	// Oculus Touch Controller
+	currBinding = 0;
+	bindings[currBinding++] = ActionSuggestedBinding(indexLeftAction, "/user/hand/left/input/trigger");
+	bindings[currBinding++] = ActionSuggestedBinding(indexRightAction, "/user/hand/right/input/trigger");
+	bindings[currBinding++] = ActionSuggestedBinding(menuAction, "/user/hand/left/input/menu/click");
 	bindings[currBinding++] = ActionSuggestedBinding(buttonAAction, "/user/hand/right/input/a/click");
 	bindings[currBinding++] = ActionSuggestedBinding(buttonBAction, "/user/hand/right/input/b/click");
+	bindings[currBinding++] = ActionSuggestedBinding(buttonXAction, "/user/hand/left/input/x/click");
+	bindings[currBinding++] = ActionSuggestedBinding(buttonYAction, "/user/hand/left/input/y/click");
 	bindings[currBinding++] = ActionSuggestedBinding(gripLeftAction, "/user/hand/left/input/squeeze/value");
 	bindings[currBinding++] = ActionSuggestedBinding(gripRightAction, "/user/hand/right/input/squeeze/value");
 	bindings[currBinding++] = ActionSuggestedBinding(moveOnLeftJoystickAction, "/user/hand/left/input/thumbstick");
@@ -306,22 +319,63 @@ void IN_VRInit( engine_t *engine ) {
 	bindings[currBinding++] = ActionSuggestedBinding(vibrateRightFeedback, "/user/hand/right/output/haptic");
 	bindings[currBinding++] = ActionSuggestedBinding(handPoseLeftAction, "/user/hand/left/input/aim/pose");
 	bindings[currBinding++] = ActionSuggestedBinding(handPoseRightAction, "/user/hand/right/input/aim/pose");
+	SuggestBindingsForProfile(engine->appState.Instance, oculusProfilePath, bindings, currBinding);
 
-	XrInteractionProfileSuggestedBinding suggestedBindings = {};
-	suggestedBindings.type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING;
-	suggestedBindings.next = NULL;
-	suggestedBindings.interactionProfile = interactionProfilePath;
-	suggestedBindings.suggestedBindings = bindings;
-	suggestedBindings.countSuggestedBindings = currBinding;
-	OXR(xrSuggestInteractionProfileBindings(engine->appState.Instance, &suggestedBindings));
+	// Valve Index Controller
+	currBinding = 0;
+	bindings[currBinding++] = ActionSuggestedBinding(indexLeftAction, "/user/hand/left/input/trigger/value");
+	bindings[currBinding++] = ActionSuggestedBinding(indexRightAction, "/user/hand/right/input/trigger/value");
+	bindings[currBinding++] = ActionSuggestedBinding(menuAction, "/user/hand/left/input/trackpad/click");
+	bindings[currBinding++] = ActionSuggestedBinding(buttonAAction, "/user/hand/right/input/a/click");
+	bindings[currBinding++] = ActionSuggestedBinding(buttonBAction, "/user/hand/right/input/b/click");
+	bindings[currBinding++] = ActionSuggestedBinding(buttonXAction, "/user/hand/left/input/a/click");
+	bindings[currBinding++] = ActionSuggestedBinding(buttonYAction, "/user/hand/left/input/b/click");
+	bindings[currBinding++] = ActionSuggestedBinding(gripLeftAction, "/user/hand/left/input/squeeze/force");
+	bindings[currBinding++] = ActionSuggestedBinding(gripRightAction, "/user/hand/right/input/squeeze/force");
+	bindings[currBinding++] = ActionSuggestedBinding(moveOnLeftJoystickAction, "/user/hand/left/input/thumbstick");
+	bindings[currBinding++] = ActionSuggestedBinding(moveOnRightJoystickAction, "/user/hand/right/input/thumbstick");
+	bindings[currBinding++] = ActionSuggestedBinding(thumbstickLeftClickAction, "/user/hand/left/input/thumbstick/click");
+	bindings[currBinding++] = ActionSuggestedBinding(thumbstickRightClickAction, "/user/hand/right/input/thumbstick/click");
+	bindings[currBinding++] = ActionSuggestedBinding(vibrateLeftFeedback, "/user/hand/left/output/haptic");
+	bindings[currBinding++] = ActionSuggestedBinding(vibrateRightFeedback, "/user/hand/right/output/haptic");
+	bindings[currBinding++] = ActionSuggestedBinding(handPoseLeftAction, "/user/hand/left/input/aim/pose");
+	bindings[currBinding++] = ActionSuggestedBinding(handPoseRightAction, "/user/hand/right/input/aim/pose");
+	SuggestBindingsForProfile(engine->appState.Instance, indexProfilePath, bindings, currBinding);
 
-	// Attach actions
+	// Pico Neo 3 Controller
+	currBinding = 0;
+	bindings[currBinding++] = ActionSuggestedBinding(indexLeftAction, "/user/hand/left/input/trigger/click");
+	bindings[currBinding++] = ActionSuggestedBinding(indexRightAction, "/user/hand/right/input/trigger/click");
+	bindings[currBinding++] = ActionSuggestedBinding(menuAction, "/user/hand/left/input/back/click");
+	bindings[currBinding++] = ActionSuggestedBinding(menuAction, "/user/hand/right/input/back/click");
+	bindings[currBinding++] = ActionSuggestedBinding(buttonAAction, "/user/hand/right/input/a/click");
+	bindings[currBinding++] = ActionSuggestedBinding(buttonBAction, "/user/hand/right/input/b/click");
+	bindings[currBinding++] = ActionSuggestedBinding(buttonXAction, "/user/hand/left/input/x/click");
+	bindings[currBinding++] = ActionSuggestedBinding(buttonYAction, "/user/hand/left/input/y/click");
+	bindings[currBinding++] = ActionSuggestedBinding(gripLeftAction, "/user/hand/left/input/squeeze/value");
+	bindings[currBinding++] = ActionSuggestedBinding(gripRightAction, "/user/hand/right/input/squeeze/value");
+	bindings[currBinding++] = ActionSuggestedBinding(moveOnLeftJoystickAction, "/user/hand/left/input/thumbstick");
+	bindings[currBinding++] = ActionSuggestedBinding(moveOnRightJoystickAction, "/user/hand/right/input/thumbstick");
+	bindings[currBinding++] = ActionSuggestedBinding(thumbstickLeftClickAction, "/user/hand/left/input/thumbstick/click");
+	bindings[currBinding++] = ActionSuggestedBinding(thumbstickRightClickAction, "/user/hand/right/input/thumbstick/click");
+	bindings[currBinding++] = ActionSuggestedBinding(vibrateLeftFeedback, "/user/hand/left/output/haptic");
+	bindings[currBinding++] = ActionSuggestedBinding(vibrateRightFeedback, "/user/hand/right/output/haptic");
+	bindings[currBinding++] = ActionSuggestedBinding(handPoseLeftAction, "/user/hand/left/input/aim/pose");
+	bindings[currBinding++] = ActionSuggestedBinding(handPoseRightAction, "/user/hand/right/input/aim/pose");
+	SuggestBindingsForProfile(engine->appState.Instance, picoProfilePath, bindings, currBinding);
+
 	XrSessionActionSetsAttachInfo attachInfo = {};
 	attachInfo.type = XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO;
-	attachInfo.next = NULL;
 	attachInfo.countActionSets = 1;
 	attachInfo.actionSets = &runningActionSet;
 	OXR(xrAttachSessionActionSets(engine->appState.Session, &attachInfo));
+
+	if (leftControllerAimSpace == XR_NULL_HANDLE) {
+		leftControllerAimSpace = CreateActionSpace(handPoseLeftAction, leftHandPath);
+	}
+	if (rightControllerAimSpace == XR_NULL_HANDLE) {
+		rightControllerAimSpace = CreateActionSpace(handPoseRightAction, rightHandPath);
+	}
 
 	// Enumerate actions
 	XrPath actionPathsBuffer[32];
