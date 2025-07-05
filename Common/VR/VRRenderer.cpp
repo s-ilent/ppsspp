@@ -373,6 +373,7 @@ void VR_EndFrame( engine_t* engine ) {
 }
 
 void VR_FinishFrame( engine_t* engine ) {
+#ifdef ANDROID
 	if (VR_GetPlatformFlag(VRPlatformFlag::VR_PLATFORM_EXTENSION_PASSTHROUGH) && VR_GetConfig(VR_CONFIG_PASSTHROUGH)) {
 		if (passthroughLayer != XR_NULL_HANDLE) {
 			XrCompositionLayerPassthroughFB passthrough_layer = {XR_TYPE_COMPOSITION_LAYER_PASSTHROUGH_FB};
@@ -382,6 +383,7 @@ void VR_FinishFrame( engine_t* engine ) {
 			engine->appState.Layers[engine->appState.LayerCount++].Passthrough = passthrough_layer;
 		}
 	}
+#endif
 
 	int vrMode = vrConfig[VR_CONFIG_MODE];
 	XrCompositionLayerProjectionView projection_layer_elements[2] = {};
