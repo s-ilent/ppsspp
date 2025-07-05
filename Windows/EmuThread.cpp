@@ -342,7 +342,7 @@ void MainThreadFunc() {
 				if (useEmuThread) EmuThreadStop();
 				break; 
 			}
-			UpdateVRInput(g_Config.bHapticFeedback, 1.0f); 
+			UpdateVRInput(g_Config.bHapticFeedback, 1.0f, 1.0f);
 
 			FinishVRRender(); 
 
